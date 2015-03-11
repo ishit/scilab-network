@@ -7,7 +7,7 @@ files = [
 "saved.c"
 ];
 ldflags = "";
-cflags = "-g";
+cflags = "-g -pthread";
 libs = [];
 tbx_build_gateway(libname, namelist, files, gateway_path, ..
  libs, ldflags, cflags);

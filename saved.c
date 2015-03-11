@@ -72,6 +72,7 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
+
 int TcpOpen(int *port)
 {
     int sockfd = 0;
@@ -81,6 +82,7 @@ int TcpOpen(int *port)
     socklen_t sin_size;
     sin_size = sizeof(client_addr);
     char ipstr[INET_ADDRSTRLEN];
+    int yes = 1;
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     memset(&serv_addr, 0, sizeof(serv_addr));
@@ -92,6 +94,12 @@ int TcpOpen(int *port)
         return 1;
     }
     serv_addr.sin_port = htons(*port);
+
+    /*Reuse sockets*/
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+        sciprint("setsockopt");
+        exit(1);
+    }
 
     if(bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1)
     {
