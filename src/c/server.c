@@ -17,52 +17,8 @@
 #include <errno.h>
 #include <signal.h>
 #include <string.h>
-#include "api_scilab.h"
-#include "Scierror.h"
-#define CHUNK_SIZE 256
-int sci_server(char *fname);
-int TcpOpen(int *port);
 
-int sci_server(char *fname)
-{
-    SciErr sciErr;
-    int iRet = 0;
-    int *piAddr = NULL;
-    double *port = 0;
-    int nRows, nCols;
-    int iPrec = 0;
-    int iType = 0;
-    int iPort;
-    double retVal = 0;
-    CheckInputArgument(pvApiCtx, 1, 1);
-    CheckOutputArgument(pvApiCtx, 1, 1);
-
-    sciErr = getVarAddressFromPosition(pvApiCtx, 1, &piAddr);
-    if(sciErr.iErr){
-    	//printError(&sciErr, 0);
-	sciprint("The error.\n");
-	//AssignOutputVariable(pvApiCtx, 1) = 0;
-	return 1;
-    }
-    sciErr = getVarType(pvApiCtx, piAddr, &iType);
-    if(sciErr.iErr || iType != sci_matrix){
-    	printError(&sciErr, 0);
-	return 1;
-    }
-    sciErr = getMatrixOfDouble(pvApiCtx, piAddr, &nRows, &nCols, &port);
-    iPort = (int)(*port);
-    TcpOpen(&iPort);
-    iRet = createScalarInteger32(pvApiCtx, nbInputArgument(pvApiCtx) + 1, retVal);
-    if(iRet){
-    	AssignOutputVariable(pvApiCtx, 1) = 0;
-	return 1;
-    }
-
-    AssignOutputVariable(pvApiCtx, 1) = nbInputArgument(pvApiCtx) + 1;
-    ReturnArguments(pvApiCtx);
-    return 0;
-}
-
+/*Get client address*/
 void *get_in_addr(struct sockaddr *sa)
 {
     if (sa->sa_family == AF_INET) {
@@ -73,7 +29,7 @@ void *get_in_addr(struct sockaddr *sa)
 }
 
 
-int TcpOpen(int *port)
+int TcpOpen(int port)
 {
     int sockfd = 0;
     int connectfd = 0;
@@ -82,37 +38,40 @@ int TcpOpen(int *port)
     socklen_t sin_size;
     sin_size = sizeof(client_addr);
     char ipstr[INET_ADDRSTRLEN];
+    char sendData[256];
+	int pid;
     int yes = 1;
 
+    /*Get socket descriptor*/
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    if (*port > 65535 || *port < 1025)
+    if (port > 65535 || port < 1025)
     {
         perror("Invalid port.");
         return 1;
     }
-    serv_addr.sin_port = htons(*port);
+    serv_addr.sin_port = htons(port);
 
     /*Reuse sockets*/
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-        sciprint("setsockopt");
+        printf("setsockopt");
         exit(1);
     }
 
     if(bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1)
     {
-        sciprint("Binding problem. Try using another port.\n");   
+        printf("Binding problem. Try using another port.\n");   
         return 1;
     }
 
     if(listen(sockfd, 10) == -1)
     {
-        sciprint("Queue full.\n");
+        printf("Queue full.\n");
         return 1;
     }
-    sciprint("Listening on port %d..\n", *port);
+    printf("Listening on port %d..\n", port);
     while (1)
     {
         connectfd = accept(sockfd, (struct sockaddr *)&client_addr, &sin_size);
@@ -125,8 +84,8 @@ int TcpOpen(int *port)
         printf("server: got connection from %s\n", ipstr);
 
         if (!fork()) { 
-            close(sockfd); 
-            if (send(connectfd, "Hello, world!", 13, 0) == -1)
+            close(sockfd);
+            if (send(connectfd, "Hello, World!", 13, 0) == -1)
                 perror("send");
             close(connectfd);
             exit(0);
@@ -134,5 +93,10 @@ int TcpOpen(int *port)
         close(connectfd);
         sleep(1);
     }
-    return 0;
+    return connectfd;
+}
+
+int close(int fd){
+	shutdown(fd, SHUT_RDWR);
+	return 0;    
 }
